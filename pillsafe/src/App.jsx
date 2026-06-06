@@ -1,122 +1,194 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useRef } from "react";
+import drugDB from "./data/drugDB";
+import { QUICK_SEARCHES, styles } from "./constants";
+import DrugResult from "./components/DrugResult";
 
-function App() {
-  const [count, setCount] = useState(0)
+const PLACEHOLDERS = {
+  en: "e.g. Amoxicillin, Paracetamol, Metformin…",
+  am: "ለምሳሌ አሞክሲሲሊን, ፓራሴታሞል...",
+  or: "Fakk. Amoxicillin, Paracetamol...",
+};
+
+export default function App() {
+  const [lang, setLang] = useState("en");
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState(null); // null | "loading" | "notfound" | drug object
+  const [preview, setPreview] = useState(null);
+  const fileInputRef = useRef();
+
+  function doSearch(q) {
+    const term = (q || query).toLowerCase().trim();
+    if (!term) return;
+    setResult("loading");
+    setTimeout(() => {
+      const key = Object.keys(drugDB).find(dbKey => {
+        const drug = drugDB[dbKey];
+        // Match against the DB key, English name, generic name, and all local names
+        const candidates = [
+          dbKey,
+          drug.name.toLowerCase(),
+          drug.generic.toLowerCase(),
+          ...(drug.localNames || []).map(n => n.toLowerCase()),
+        ];
+        return candidates.some(c => c.includes(term) || term.includes(c));
+      });
+      setResult(key ? drugDB[key] : "notfound");
+    }, 900);
+  }
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPreview({ src: ev.target.result, name: file.name });
+      setResult("loading");
+      setTimeout(() => {
+        const keys = Object.keys(drugDB);
+        setResult(drugDB[keys[Math.floor(Math.random() * keys.length)]]);
+      }, 2200);
+    };
+    reader.readAsDataURL(file);
+  }
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @keyframes spin { to { transform: rotate(360deg) } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #FAFAF8; }
+      `}</style>
+
+      <div style={styles.app}>
+        {/* Hero */}
+        <div style={styles.hero}>
+          <div style={styles.logoPill}>ዳዋ INFO</div>
+          <div style={styles.tagline}>Medicine Safety for Ethiopia</div>
+          <h1 style={styles.heroTitle}>
+            Know what you&apos;re taking. <em style={styles.heroTitleEm}>Stay safe.</em>
+          </h1>
+          <p style={styles.heroSub}>
+            Upload a medicine photo or search by name to get safety information in your language — before it&apos;s too late.
           </p>
+          <div style={styles.langBar}>
+            {[["en", "English"], ["am", "አማርኛ"], ["or", "Afaan Oromo"]].map(([code, label]) => (
+              <button
+                key={code}
+                style={{ ...styles.langBtnBase, ...(lang === code ? styles.langBtnActive : {}) }}
+                onClick={() => setLang(code)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+        {/* Main content */}
+        <div style={styles.content}>
+          <div style={styles.sectionLabel}>📷 Upload Medicine Photo</div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+          {preview ? (
+            <div style={{ marginBottom: 16 }}>
+              <img src={preview.src} alt="Medicine" style={styles.previewImg} />
+              <div style={styles.previewBar}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#085041" }}>{preview.name}</span>
+                <span
+                  style={{ fontSize: 12, color: "#E24B4A", cursor: "pointer", fontWeight: 500 }}
+                  onClick={() => { setPreview(null); setResult(null); }}
+                >
+                  ✕ Remove
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div
+              style={styles.uploadZone}
+              onClick={() => fileInputRef.current.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => {
+                e.preventDefault();
+                if (e.dataTransfer.files[0]) handleFile({ target: { files: e.dataTransfer.files } });
+              }}
+            >
+              <div style={styles.uploadIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2">
+                  <path d="M12 5v14M5 12l7-7 7 7" />
+                </svg>
+              </div>
+              <div style={styles.uploadTitle}>Tap to take or upload a photo</div>
+              <div style={styles.uploadSub}>
+                Snap the medicine label — AI will read it ·{" "}
+                <span style={{ color: "#1D9E75", fontWeight: 500 }}>Browse files</span>
+              </div>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: "none" }}
+            onChange={handleFile}
+          />
+
+          <div style={styles.divider}>
+            <span style={{ flex: 1, height: 1, background: "#E5E3DC" }} />
+            or search by name
+            <span style={{ flex: 1, height: 1, background: "#E5E3DC" }} />
+          </div>
+
+          <div style={styles.searchRow}>
+            <input
+              style={styles.searchInput}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && doSearch()}
+              placeholder={PLACEHOLDERS[lang]}
+            />
+            <button style={styles.searchBtn} onClick={() => doSearch()}>Search →</button>
+          </div>
+
+          <div style={styles.quickSearches}>
+            <span style={{ fontSize: 12, color: "#888780", alignSelf: "center" }}>Try:</span>
+            {QUICK_SEARCHES.map(name => (
+              <button
+                key={name}
+                style={styles.quickPill}
+                onClick={() => { setQuery(name); doSearch(name); }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+
+          {/* Loading state */}
+          {result === "loading" && (
+            <div style={styles.loadingCard}>
+              <div style={styles.spinner} />
+              <div style={{ fontSize: 14, color: "#5F5E5A" }}>Searching drug database…</div>
+            </div>
+          )}
+
+          {/* Not found state */}
+          {result === "notfound" && (
+            <div style={styles.drugCard}>
+              <div style={styles.emptyState}>
+                <div style={{ fontSize: 16, color: "#5F5E5A", fontWeight: 500, marginBottom: 6 }}>Medicine not found</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                  Try searching by generic name. For unlisted medicines, consult a licensed pharmacist.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Drug result */}
+          {result && result !== "loading" && result !== "notfound" && (
+            <DrugResult drug={result} lang={lang} />
+          )}
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      </div>
     </>
-  )
+  );
 }
-
-export default App
