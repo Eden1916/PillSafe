@@ -3,9 +3,8 @@ import drugDB from "./data/drugDB";
 import { QUICK_SEARCHES, styles } from "./constants";
 import DrugResult from "./components/DrugResult";
 
-// When the backend is running locally, calls go to the FastAPI server.
-// If the backend is offline, searches fall back to the local drugDB.
-const API_BASE = "http://localhost:8000";
+// Switch between local dev and deployed backend automatically
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const PLACEHOLDERS = {
   en: "e.g. Amoxicillin, Paracetamol, Metformin…",
