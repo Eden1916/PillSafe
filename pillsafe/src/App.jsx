@@ -3,6 +3,10 @@ import drugDB from "./data/drugDB";
 import { QUICK_SEARCHES, styles } from "./constants";
 import DrugResult from "./components/DrugResult";
 
+// When the backend is running locally, calls go to the FastAPI server.
+// If the backend is offline, searches fall back to the local drugDB.
+const API_BASE = "http://localhost:8000";
+
 const PLACEHOLDERS = {
   en: "e.g. Amoxicillin, Paracetamol, Metformin…",
   am: "ለምሳሌ አሞክሲሲሊን, ፓራሴታሞል...",
@@ -16,37 +20,76 @@ export default function App() {
   const [preview, setPreview] = useState(null);
   const fileInputRef = useRef();
 
-  function doSearch(q) {
-    const term = (q || query).toLowerCase().trim();
+  async function doSearch(q) {
+    const term = (q || query).trim();
     if (!term) return;
     setResult("loading");
-    setTimeout(() => {
-      const key = Object.keys(drugDB).find(dbKey => {
-        const drug = drugDB[dbKey];
-        // Match against the DB key, English name, generic name, and all local names
-        const candidates = [
-          dbKey,
-          drug.name.toLowerCase(),
-          drug.generic.toLowerCase(),
-          ...(drug.localNames || []).map(n => n.toLowerCase()),
-        ];
-        return candidates.some(c => c.includes(term) || term.includes(c));
-      });
-      setResult(key ? drugDB[key] : "notfound");
-    }, 900);
+
+    // Try the real backend first
+    try {
+      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(term)}&lang=${lang}`);
+      if (res.ok) {
+        const data = await res.json();
+        setResult(data.drug);
+        return;
+      }
+      if (res.status === 404) {
+        setResult("notfound");
+        return;
+      }
+    } catch {
+      // Backend offline — fall through to local drugDB
+    }
+
+    // Local fallback
+    const termLower = term.toLowerCase();
+    const key = Object.keys(drugDB).find(dbKey => {
+      const drug = drugDB[dbKey];
+      const candidates = [
+        dbKey,
+        drug.name.toLowerCase(),
+        drug.generic.toLowerCase(),
+        ...(drug.localNames || []).map(n => n.toLowerCase()),
+      ];
+      return candidates.some(c => c.includes(termLower) || termLower.includes(c));
+    });
+    setResult(key ? drugDB[key] : "notfound");
   }
 
-  function handleFile(e) {
+  async function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Show preview immediately
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       setPreview({ src: ev.target.result, name: file.name });
       setResult("loading");
-      setTimeout(() => {
-        const keys = Object.keys(drugDB);
-        setResult(drugDB[keys[Math.floor(Math.random() * keys.length)]]);
-      }, 2200);
+
+      // Try the real backend OCR endpoint
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch(`${API_BASE}/ocr?lang=${lang}`, {
+          method: "POST",
+          body: formData,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setResult(data.drug);
+          return;
+        }
+        if (res.status === 404 || res.status === 422) {
+          setResult("notfound");
+          return;
+        }
+      } catch {
+        // Backend offline — fall through to local random demo
+      }
+
+      // Local fallback: return a random drug as a demo
+      const keys = Object.keys(drugDB);
+      setResult(drugDB[keys[Math.floor(Math.random() * keys.length)]]);
     };
     reader.readAsDataURL(file);
   }
