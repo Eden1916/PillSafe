@@ -1,0 +1,49 @@
+# Core Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Data Validation & Settings
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# AI & OCR
+pytesseract==0.3.10
+pillow==10.1.0
+opencv-python==4.8.1.78
+
+# Google Cloud AI Services
+google-cloud-vision==3.4.0
+google-cloud-translate==3.11.0
+
+# Translation (FIXED)
+deep-translator==1.11.4
+
+# HTTP Client
+requests==2.31.0
+httpx==0.25.1
+
+# Database & Caching
+redis==5.0.1
+sqlalchemy==2.0.23
+
+# Image Processing
+imageio==2.33.0
+scikit-image==0.22.0
+
+# Utilities
+email-validator==2.1.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Logging
+loguru==0.7.2
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1
+
+# Deployment
+gunicorn==21.2.0
